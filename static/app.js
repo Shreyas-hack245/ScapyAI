@@ -5,11 +5,14 @@ function render(data) {
   $('#packet-count').textContent = data.packet_count ?? '--';
   $('#protocol-count').textContent = data.protocols?.length ?? '--';
   $('#alert-count').textContent = data.suspicious?.length ?? '0';
+  $('#nav-alert-count').textContent = data.suspicious?.length ?? '0';
+  $('#latency').textContent = data.latency_ms == null ? '--' : `${data.latency_ms} ms`;
   const bars = $('#protocol-bars');
   if (!data.protocols?.length) { bars.className = 'bars empty-state'; bars.innerHTML = '<p>No recognized protocols in this result.</p>'; }
   else { const max = Math.max(...data.protocols.map(item => item.count)); bars.className = 'bars'; bars.innerHTML = data.protocols.map(item => `<div class="bar-group"><span class="bar-value">${item.count}</span><div class="bar" style="height:${Math.max(5, item.count / max * 105)}px"></div><span class="bar-label">${item.name}</span></div>`).join(''); }
   const table = $('#packet-table');
   table.innerHTML = data.packets?.length ? data.packets.slice().reverse().map(packet => `<tr><td>${packet.time}</td><td>${packet.source}</td><td>${packet.destination}</td><td><span class="protocol-tag">${packet.protocol}</span></td><td>${packet.length} B</td><td>${packet.port ? `port ${packet.port}` : packet.flags || '-'}</td></tr>`).join('') : '<tr><td colspan="6" class="empty-table">No packets in view yet.</td></tr>';
+  $('#detection-list').innerHTML = data.suspicious?.length ? data.suspicious.map(item => `<div class="detection-item"><span class="detection-mark">!</span><div><strong>${item.type.replaceAll('_', ' ')}</strong><small>${item.source ? `${item.source} / ` : ''}${item.evidence}</small></div></div>`).join('') : '<p class="empty-table">No heuristic signals in view yet.</p>';
 }
 
 async function runCommand(command, authorized = false) { const response = await fetch('/api/command', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({command, authorized}) }); const body = await response.json(); if (!response.ok) throw new Error(body.detail || 'Command failed'); render(body.data); toast(body.summary); }
@@ -17,3 +20,4 @@ $('#command-form').addEventListener('submit', async (event) => { event.preventDe
 document.querySelectorAll('[data-command]').forEach(button => button.addEventListener('click', () => { $('#command-input').value = button.dataset.command; $('#command-form').requestSubmit(); }));
 $('#pcap-input').addEventListener('change', async (event) => { const file = event.target.files[0]; if (!file) return; const form = new FormData(); form.append('file', file); $('#upload-status').textContent = 'Reading capture...'; try { const response = await fetch('/api/upload', {method:'POST', body:form}); const body = await response.json(); if (!response.ok) throw new Error(body.detail); render(body); $('#upload-status').textContent = `${file.name} loaded`; toast(`Analyzed ${file.name}`); } catch(error) { $('#upload-status').textContent = 'Upload failed'; toast(error.message, true); } });
 $('#clear-button').addEventListener('click', () => render({packet_count: 0, protocols: [], suspicious: [], packets: []}));
+document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active')); button.classList.add('active'); const target = button.dataset.target; if (target) document.getElementById(target).scrollIntoView({behavior: 'smooth', block: 'start'}); else window.scrollTo({top: 0, behavior: 'smooth'}); }));
